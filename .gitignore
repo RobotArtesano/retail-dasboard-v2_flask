@@ -1,0 +1,44 @@
+# Entornos virtuales, archivos compilados de Python y archivos de configuración 
+# sensibles no deben ser incluidos en el repositorio.
+# Entornos Virtuales
+venv/
+env/
+.venv/
+ENV/
+
+# Variables de entorno (Claves secretas, contraseñas de BD)
+.env
+.env.*
+!.env.example 
+.flaskenv
+
+# Archivos de caché de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Bases de datos locales
+*.sqlite
+*.sqlite3
+*.db
+instance/
+.webassets-cache
+
+# Archivos de sistema operativo
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Testing/coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Jupyter (si usas)
+.ipynb_checkpoints/

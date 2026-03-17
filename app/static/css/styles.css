@@ -1,0 +1,69 @@
+/* Size for brand */
+nav .navbar-brand
+{
+    font-size: xx-large;
+}
+
+/* Colors for brand */
+nav .navbar-brand .verde_fondo
+{
+    color: #23C467;
+}
+nav .navbar-brand .black_green
+{
+    color: #344239;
+}
+
+table {
+    border-collapse: collapse;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: center;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 12px;
+    text-align: left;
+}
+
+th {
+    background-color: #f2f2f2; /* Fondo gris claro para los encabezados */
+    font-weight: bold;     /* Texto en negrita */
+}
+
+tr:hover {
+    background-color: #f5f5f5; /* Efecto al pasar el mouse */
+}
+
+
+/* dorado para el Punto de reorden (cuando el stock es critico) */
+:root {
+    --black-green: #344239;
+    --retail-green: #23C467;
+    --retail-gold: #D4AF37; /* Un dorado sobrio */
+    --alert-orange: #D35400; /* Naranja-Rojizo para alertas críticas */
+    --pure-white: #FFFFFF;
+}
+
+/* Clase para alertas de inventario o financiero */
+.status-critical {
+    color: var(--alert-orange);
+    font-weight: bold;
+    border-left: 4px solid var(--alert-orange);
+}
+
+body {
+    background-color: var(--pure-white);
+    color: var(--black-green);
+}
+
+.sidebar {
+    background-color: var(--black-green);
+    color: var(--pure-white);
+}
+
+.btn-primary {
+    background-color: var(--retail-green);
+    border: none;
+}

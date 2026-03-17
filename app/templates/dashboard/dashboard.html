@@ -1,0 +1,23 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Dashboard
+{% endblock %}
+
+{% block main %}
+<h2 class="mb-4">Computations and analysis</h2>
+
+<div class="row">
+    <div class="col-md-2"><strong>Gross Sales:</strong> {{ "${:,.2f}".format(venta_bruta) }}</div>
+    <div class="col-md-2"><strong>Net Sales:</strong> {{ "${:,.2f}".format(venta_neta) }}</div>
+    <div class="col-md-2"><strong>Units sold:</strong> {{ venta_unidades }}</div>
+    <div class="col-md-2"><strong>Gross earnigs:</strong> {{ "${:,.2f}".format(ganancia_bruta) }}</div>
+    <div class="col-md-2"><strong>Profit percentage:</strong> {{ "{:.2f} %".format(porcentaje_utilidad) }}</div>
+</div>
+
+<hr>
+
+<div id="grafica">
+    {{ grafica | safe }}
+</div>
+{% endblock %}
