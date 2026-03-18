@@ -43,13 +43,13 @@
                 </ul>
                 <ul class="navbar-nav ms-auto mt-2">
                     <li class="nav-item"><span class="nav-link text-muted">Hola, {{ current_user.username }}</span></li>
-                    <li class="nav-item"><a class="nav-link" href="/changepassword">Change Password</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/logout">Log Out</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.change_password') }}">Change Password</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.logout') }}">Log Out</a></li>
                 </ul>
                 {% else %}
                 <ul class="navbar-nav ms-auto mt-2">
-                    <li class="nav-item"><a class="nav-link" href="/register">Register</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/login">Log In</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.register') }}">Register</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.login') }}">Log In</a></li>
                 </ul>
                 {% endif %}
             </div>
