@@ -3,6 +3,7 @@ from flask_login import login_required, current_user
 from app import db
 from app.models import Sale, Product, Inventory
 from app.utils.supplychain import process_upload
+from app.utils.storage import backup_file_to_r2
 import numpy as np # para manejar valores nulos de pandas y convertirlos a None para la base de datos
 
 bp = Blueprint('dashboard', __name__)
@@ -47,6 +48,15 @@ def upload_file():
     
     # Leemos el archivo en memoria como bytes para pasarlo a la función de procesamiento
     file_bytes = file.read()
+
+    # --- NUEVO: RESPALDO EN LA NUBE (DATA LAKE) ---
+    # Lo hacemos en un try/except para que, si el internet falla o R2 se cae, 
+    # no detengamos el proceso principal del cliente.
+    try:
+        backup_file_to_r2(file_bytes, file.filename, upload_type, current_user.user_id)
+    except Exception as e:
+        print(f"Advertencia: No se pudo respaldar en R2 -> {e}")
+    # ----------------------------------------------
 
     # 2. Invocamos nuestro Motor Multi-ETL (pandas) para procesar los archivos, normalizarlo y validar su contenido
     df, errores = process_upload(file_bytes, file.filename, upload_type)
