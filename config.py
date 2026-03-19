@@ -16,6 +16,9 @@ class Config:
     # os.environ.get busca la variable de entorno, si no la encuentra, usa segundo valor como respaldo (fallback). En producción, se debe establecer la variable de entorno SECRET_KEY con un valor seguro y aleatorio.
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret')
 
+    # --- Seguridad de Acceso (codigo por invitacion)---
+    REGISTRATION_CODE = os.environ.get('REGISTRATION_CODE')  # Codigo de invitacion para registro. Se valida en auth/routes.py, si no coincide, se rechaza el registro.
+
     # --- CONFIGURACIÓN DE BASE DE DATOS ---
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///' + os.path.join(basedir, 'app.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -26,10 +29,10 @@ class Config:
     SESSION_COOKIE_SECURE = False  # Asegura que las cookies solo se envíen a través de HTTPS (obligatorio en producción), en desarrollo local se puede dejar en False.
 
     # Cloudflare R2 Configuration
-    R2_BUCKET = os.environ.get('R2_BUCKET')
+    R2_BUCKET = os.environ.get('R2_BUCKET_NAME')
     R2_ACCESS_KEY = os.environ.get('R2_ACCESS_KEY')
     R2_SECRET_KEY = os.environ.get('R2_SECRET_KEY')
-    R2_ENDPOINT = os.environ.get('R2_ENDPOINT')
+    R2_ENDPOINT = os.environ.get('R2_ENDPOINT_URL')
 
     # Limite maximo de tamaño de archivo subido (16MB)
     # suficiente para unas 200,000 filas de CSV)

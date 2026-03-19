@@ -1,3 +1,4 @@
+import os
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_user, logout_user, login_required, current_user
 from app import db, limiter
@@ -15,6 +16,19 @@ def register():
         return redirect(url_for('dashboard.index'))
 
     if request.method == 'POST':
+
+        # ACCESO CON CODIGO DE INVITACION: Para controlar quién puede registrarse, agregamos un campo de código de invitación en el formulario de registro.
+        # 1. Recibimos el código que escribió el usuario y el código real del .env
+        codigo_ingresado = request.form.get('access_code')
+        codigo_secreto = os.environ.get('REGISTRATION_CODE')
+
+        # 2. El Guardia de Seguridad: Si no coinciden, lo rebotamos inmediatamente
+        if codigo_ingresado != codigo_secreto:
+            flash('Código de invitación inválido. Acceso denegado.', 'error')
+            return redirect(url_for('auth.register'))
+        # =========================================================================
+
+        # 3. Si el código es correcto, continuamos con tu lógica normal de registro
         username = request.form.get("username")
         email = request.form.get("email")
         password = request.form.get("password")

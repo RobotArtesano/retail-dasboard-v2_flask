@@ -42,3 +42,6 @@ htmlcov/
 
 # Jupyter (si usas)
 .ipynb_checkpoints/
+
+# Otros archivos que no quieres subir
+notas.txt

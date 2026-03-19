@@ -11,11 +11,23 @@
             <input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="username" placeholder="Username" type="text">
         </div>
         <div class="mb-3">
+            <input autocomplete="off" autofocus class="form-control mx-auto w-auto" name="email" placeholder="Email" type="email">
+        </div>
+        <div class="mb-3">
             <input class="form-control mx-auto w-auto" name="password" placeholder="Password" type="password">
         </div>
         <div class="mb-3">
             <input autocomplete="off" autofocus class="form-control mx-auto w-auto" placeholder= "confirm password" name="confirmation" type="password">
         </div>
+
+        <div class="mb-4">
+        <label for="access_code" class="form-label fw-bold text-black-green">
+            <i class="bi bi-key-fill"></i> Código de Invitación VIP
+        </label>
+            <input type="text" class="form-control border-secondary" name="access_code" id="access_code" placeholder="Ingrese su código de acceso" required>
+            <div class="form-text text-muted">Requerido para cuentas de demostración.</div>
+        </div>
+        
         <button class="btn btn-primary" type="submit">Register</button>
     </form>
 {% endblock %}

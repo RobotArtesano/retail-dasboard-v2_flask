@@ -13,6 +13,7 @@ REQUIRED_CATALOG_COLS = ['sku_code', 'name', 'price', 'cost']
 REQUIRED_INVENTORY_COLS = ['sku_code', 'store', 'inv_qty']
 # Opcionales: on_order, safety_stock, etc.
 
+# Diccionario de sinónimos para normalizar las columnas Minimas Requeridas.
 SYNONYMS = {
    "store": ["tienda","location","sucursal","branch","punto_venta","pos","punto de venta","puntodeventa","punto deventa","pdv","tiendas","centros","centro",
              "sucursales"],
@@ -31,6 +32,7 @@ SYNONYMS = {
     "department": ["department","departamento","category","categoria", "categoria_producto", "departamento_producto"],
     "price": ["price","precio","precio_lista","list_price","precio_lleno", "precio_venta", "precio_sugerido", "precio_referencia", "full_price", "precio_base",
               "precio_catalogo"],
+    "cost": ["cost","costo","costo_proveedor","costo_unitario", "costo_producto", "unit_cost", "cost_price", "precio_costo","costo_material"],
 
     # Inventario
     "inv_qty": ["inventory","stock","inventario","quantity_on_hand","inv","IOH", "cantidad_disponible", "cantidad_inventario", "existencia", "cantidad_existencia",

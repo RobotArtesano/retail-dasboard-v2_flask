@@ -18,6 +18,12 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(64), index=True, unique=True, nullable=False)
     email = db.Column(db.String(120), index=True, unique=True, nullable=False) # permite login por email
     is_verified = db.Column(db.Boolean, default=False)  # Para futuras funcionalidades de verificación de email
+
+    # Linea para el futuro: (Super admin, permisos, roles, etc)
+
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)  # Para futuras funcionalidades de administración y gestión de usuarios
+
+    # =========================================================
     password_hash = db.Column(db.String(200), nullable=False)
     created_at = db.Column(db.TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
@@ -35,6 +41,13 @@ class User(UserMixin, db.Model):
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+    
+    # ARREGLO PARA FLASK-LOGIN: por defecto, Flask-Login espera que el modelo de usuario tenga un campo 'id' como llave primaria. 
+    # Si usas otro nombre (como user_id), debes indicarle a Flask-Login cómo cargar el usuario desde la sesión.
+    def get_id(self):
+        # """Sobrescribe el método get_id para que Flask-Login use user_id en lugar de id."""
+        return str(self.user_id)
+    # =======================================================================================
     
 
 class Product(db.Model):
@@ -60,6 +73,7 @@ class Product(db.Model):
     supplier = db.Column(db.String(100))
     created = db.Column(db.TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
 
+    
     # Unique constraint para evitar registros duplicados de ventas (mismo usuario, fecha, SKU y tienda)
     # Las bases de datos crean indices únicos automáticamente para estas columnas, lo que mejora el rendimiento de las consultas y
     #  garantiza la integridad de los datos.
