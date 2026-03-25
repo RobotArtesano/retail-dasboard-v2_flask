@@ -15,28 +15,28 @@ REQUIRED_INVENTORY_COLS = ['sku_code', 'store', 'inv_qty']
 
 # Diccionario de sinónimos para normalizar las columnas Minimas Requeridas.
 SYNONYMS = {
-   "store": ["tienda","location","sucursal","branch","punto_venta","pos","punto de venta","puntodeventa","punto deventa","pdv","tiendas","centros","centro",
+   "store": ["store","tienda","location","sucursal","branch","punto_venta","pos","punto de venta","puntodeventa","punto deventa","pdv","tiendas","centros","centro",
              "sucursales"],
     "date": ["date","fecha","timestamp","datetime","fecha_venta","fecha de venta","fecha de contabilizacion","fecha_contabilizacion","fecha de contabilizacion",
              "fecha_contabilización","fecha de contabilización","fecha de transacción","fecha_transaccion","fecha de transacción","fecha_transacción",
              "fecha_hora","fecha y hora","fecha de registro","fecha_registro"],
-    "sku_code": ["sku","product","producto","item","articulo","codigo", "sku_id","material","modelo","articulo padre","articulo hijo"], # Nuestro modelo usa sku_code
+    "sku_code": ["sku_code","sku","product","producto","item","articulo","codigo", "sku_id","material","modelo","articulo padre","articulo hijo"], # Nuestro modelo usa sku_code
 
     # Ventas
-    "qty_sold": ["unidades","piezas","units","uds","pz","pzas","cantidad","piezas vendidas","qty", "quantity","UM","cantidad_vendida"],
-    "price_sale": ["precio_neto","price_net","venta","venta_neta", "precio neto", "price", "precio"],
-    "unit_cost": ["cost","costo","costo_tienda","costo_unitario","costo_proveedor"],
+    "qty_sold": ["qty_sold","unidades","piezas","units","uds","pz","pzas","cantidad","piezas vendidas","qty", "quantity","UM","cantidad_vendida"],
+    "price_sale": ["price_sale","precio_neto","price_net","venta","venta_neta", "precio neto", "price", "precio"],
+    "unit_cost": ["unit_cost","cost","costo","costo_tienda","costo_unitario","costo_proveedor"],
 
     # Catalogo
-    "name": ["nombre", "descripcion", "product_name", "product", "producto", "description", "nombre_producto", "producto_nombre"],
-    "department": ["department","departamento","category","categoria", "categoria_producto", "departamento_producto"],
+    "name": ["name","nombre", "descripcion", "product_name", "product", "producto", "description", "nombre_producto", "producto_nombre"],
+    "department": ["department","department","departamento","category","categoria", "categoria_producto", "departamento_producto"],
     "price": ["price","precio","precio_lista","list_price","precio_lleno", "precio_venta", "precio_sugerido", "precio_referencia", "full_price", "precio_base",
               "precio_catalogo"],
     "cost": ["cost","costo","costo_proveedor","costo_unitario", "costo_producto", "unit_cost", "cost_price", "precio_costo","costo_material"],
 
     # Inventario
-    "inv_qty": ["inventory","stock","inventario","quantity_on_hand","inv","IOH", "cantidad_disponible", "cantidad_inventario", "existencia", "cantidad_existencia",
-                "cantidad_stock", "existencias", "stock_disponible", "disponible_stock", "disponible_inventario", "disponible", "on_hand"],
+    "inv_qty": ["inv_qty","inventory","stock","inventario","quantity_on_hand","inv","IOH", "cantidad_disponible", "cantidad_inventario", "existencia", "cantidad_existencia",
+                "cantidad_stock", "existencias", "stock_disponible", "disponible_stock", "disponible_inventario", "disponible", "on_hand", "stock_actual", "cantidad_on_hand"],
 }
 
 def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -45,13 +45,24 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     columns_lower = {col.lower().strip(): col for col in df.columns}
     mapping = {}
     
+    # 1. EL ESCUDO: Si la columna YA viene con el nombre correcto, la mapeamos y la sacamos del juego
+    canonical_names = set(SYNONYMS.keys())
+    for col_lower in list(columns_lower.keys()):
+        if col_lower in canonical_names:
+            mapping[columns_lower[col_lower]] = col_lower
+            del columns_lower[col_lower] # La eliminamos para que no sea sobreescrita por accidente
+            
+    # 2. LA BÚSQUEDA: Buscamos sinónimos SOLO para las columnas "feas" que sobraron
     for canonical_name, aliases in SYNONYMS.items():
         for alias in aliases:
             if alias.lower() in columns_lower:
-                # Mapeamos el nombre original al nombre canónico
+                # Si encontramos un sinónimo, lo mapeamos y también lo sacamos del juego
                 mapping[columns_lower[alias.lower()]] = canonical_name
-                break # Encontramos la coincidencia para este nombre canónico
-                
+                del columns_lower[alias.lower()]
+                break # Pasamos a la siguiente regla
+
+    # logging para debug: mostrar qué columnas se mapearon y cuáles no se reconocieron
+    print("Column mapping aplicado:", mapping)
     return df.rename(columns=mapping)
 
 # Tipado y Firmas (sintaxis typing) para mayor claridad y mantenimiento del código
