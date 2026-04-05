@@ -1,15 +1,149 @@
 {% extends "layout.html" %}
 
-{% block title %}
-    Indicadores Financieros
-{% endblock %}
+{% block title %}Finanzas{% endblock %}
 
 {% block main %}
+<div class="container text-start">
+    <h2 class="text-black-green fw-bold mb-4">Inteligencia Financiera</h2>
 
-     <footer class="mb-5">
-            <div>
-                    SOON!
+    {% if global_kpis %}
+    <div class="row mb-5">
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm border-0 h-100" style="border-left: 5px solid #0d6efd !important;">
+                <div class="card-body">
+                    <h6 class="text-muted text-uppercase mb-1" style="font-size: 0.8rem;">Venta Neta Retail</h6>
+                    <h3 class="mb-0 fw-bold">${{ "{:,.2f}".format(global_kpis['1_Ventas_Neta_Retail']) }}</h3>
+                </div>
             </div>
-        </footer>
+        </div>
 
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm border-0 h-100" style="border-left: 5px solid #198754 !important;">
+                <div class="card-body">
+                    <h6 class="text-muted text-uppercase mb-1" style="font-size: 0.8rem;">Utilidad Bruta</h6>
+                    <h3 class="mb-0 fw-bold text-success">${{ "{:,.2f}".format(global_kpis['4_Utilidad']) }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm border-0 h-100" style="border-left: 5px solid #ffc107 !important;">
+                <div class="card-body">
+                    <h6 class="text-muted text-uppercase mb-1" style="font-size: 0.8rem;">Margen Bruto</h6>
+                    <h3 class="mb-0 fw-bold">{{ "{:,.2f}".format(global_kpis['3_Margen_Bruto_Pct']) }}%</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm border-0 h-100" style="border-left: 5px solid #6c757d !important;">
+                <div class="card-body">
+                    <h6 class="text-muted text-uppercase mb-1" style="font-size: 0.8rem;">Rotación (Unidades)</h6>
+                    <h3 class="mb-0 fw-bold">
+                        {% if global_kpis['13_Rotacion_Unidades'] == 'Inventario Cero' %}
+                            N/A
+                        {% else %}
+                            {{ "{:,.2f}".format(global_kpis['13_Rotacion_Unidades']) }}
+                        {% endif %}
+                    </h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    <h4 class="text-black-green fw-bold mb-3">Desglose por Producto (SKU)</h4>
+    <div class="table-responsive shadow-sm rounded bg-white p-3">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>SKU</th>
+                    <th>Venta Neta</th>
+                    <th>Costo Vendido</th>
+                    <th>Utilidad</th>
+                    <th>Margen %</th>
+                    <th>Sell Through</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fila in kpis_by_sku %}
+                <tr>
+                    <td class="fw-bold">{{ fila['Dimension'] }}</td>
+                    <td>${{ "{:,.2f}".format(fila['1_Ventas_Neta_Retail']) }}</td>
+                    <td>${{ "{:,.2f}".format(fila['2_Costo_Vendido']) }}</td>
+                    <td class="text-success fw-bold">${{ "{:,.2f}".format(fila['4_Utilidad']) }}</td>
+                    <td>
+                        <span class="badge {% if fila['3_Margen_Bruto_Pct'] < 0 %}bg-danger{% else %}bg-secondary{% endif %}">
+                            {{ "{:,.2f}".format(fila['3_Margen_Bruto_Pct']) }}%
+                        </span>
+                    </td>
+                    <td>{{ "{:,.2f}".format(fila['16_Sell_Through_Pct']) }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+
+
+    <div class="row mt-5">
+        <div class="col-12">
+            <h4 class="text-black-green fw-bold mb-3">Ventas Netas por Producto</h4>
+            <div class="bg-white p-4 rounded shadow-sm">
+                <canvas id="ventasChart" height="80"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        // 1. EL PUENTE MÁGICO: Pasamos el diccionario de Python (Jinja) a JavaScript
+        // Usamos el filtro 'tojson' para que JavaScript entienda el formato a la perfección
+        const datosKpi = {{ kpis_by_sku | tojson}}; // REVISAR PROBLEMA!!!!!!!!!!!!!
+        
+        // 2. Extraemos las listas para los ejes X y Y
+        const etiquetasSku = datosKpi.map(item => item.Dimension);
+        const datosVentas = datosKpi.map(item => item['1_Ventas_Neta_Retail']);
+
+        // 3. Pintamos la gráfica de barras
+        const ctx = document.getElementById('ventasChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: etiquetasSku,
+                datasets: [{
+                    label: 'Venta Neta Retail ($)',
+                    data: datosVentas,
+                    backgroundColor: 'rgba(13, 110, 253, 0.8)', // Azul Bootstrap
+                    borderColor: 'rgba(13, 110, 253, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4 // Bordes redondeados para un look moderno
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false } // Ocultamos la leyenda para que se vea más limpio
+                },
+                scales: {
+                    y: { 
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value; // Le ponemos el signo de pesos al eje Y
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+
+
+
+    {% else %}
+    <div class="alert alert-warning text-center mt-5">
+        Aún no hay suficientes datos para calcular tus finanzas. Por favor, sube tus catálogos y ventas en el Dashboard.
+    </div>
+    {% endif %}
+</div>
 {% endblock %}

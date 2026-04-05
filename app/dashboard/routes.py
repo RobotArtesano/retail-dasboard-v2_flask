@@ -6,6 +6,12 @@ from app.utils.supplychain import process_upload
 from app.utils.storage import backup_file_to_r2
 import numpy as np # para manejar valores nulos de pandas y convertirlos a None para la base de datos
 
+from app.utils.finance import get_retail_kpis
+
+
+from flask import current_app
+from app.analytics.tasks import tarea_de_prueba
+
 bp = Blueprint('dashboard', __name__)
 
 @bp.route('/', methods=['GET'])
@@ -24,6 +30,23 @@ def index():
 
     # Pasamos esta variable booleana a nuestra plantilla HTML
     return render_template('dashboard/index.html', has_catalog=has_catalog)
+
+@bp.route('/finance')
+@login_required
+def finance():
+    # 1. Pedimos los KPIs Totales para las tarjetas superiores
+    kpi_list_total = get_retail_kpis(current_user.user_id, group_by='total')
+    # Como agrupamos por 'total', la lista solo trae 1 elemento. Lo extraemos de forma segura.
+    global_kpis = kpi_list_total[0] if kpi_list_total else None
+
+    # 2. Pedimos los KPIs desglosados por SKU para la tabla detallada
+    kpis_by_sku = get_retail_kpis(current_user.user_id, group_by='sku_code')
+
+    return render_template(
+        'analytics/finance.html', 
+        global_kpis=global_kpis,
+        kpis_by_sku=kpis_by_sku
+    )
 
 
 @bp.route('/upload', methods=['POST'])
@@ -246,3 +269,23 @@ def _obtener_mapa_skus(lista_skus):
         Product.user_id == current_user.user_id
     ).all()
     return {p.sku_code: p.id for p in productos}
+
+
+
+
+
+# RUTA DE PRUEBA PARA DISPARAR EL WORKER DESDE EL DASHBOARD (TESTEO)
+@bp.route('/disparar-trabajador')
+def disparar_trabajador():
+    # El "mesero" (Flask) toma la tarea y la manda a la "cocina" (Redis)
+    # Le pasamos el número 777 como si fuera el user_id
+    trabajo = current_app.task_queue.enqueue(tarea_de_prueba, 777)
+    
+    return f"""
+    <h1>¡Orden enviada a la cocina! 🍳</h1>
+    <p>Revisa tu otra terminal (la del Worker). Deberías ver cómo empieza a trabajar.</p>
+    <p>El ID de este ticket es: {trabajo.id}</p>
+    """
+# Nota: Para probar esta ruta, asegúrate de tener el worker corriendo en otra terminal. 
+#Luego, accede a http://localhost:5000/disparar-trabajador para enviar una tarea de prueba al worker.
+# Deberías ver la salida en la terminal del worker indicando que ha recibido y procesado la tarea.

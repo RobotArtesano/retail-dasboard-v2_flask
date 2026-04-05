@@ -5,6 +5,8 @@ from config import Config
 from flask_wtf.csrf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from redis import Redis
+import rq
 
 # Inicialización de la aplicación Flask, la base de datos SQLAlchemy y el LoginManager
 # Este archivo convierte la carpeta app en un paquete de Python, permitiendo la importación de módulos dentro de la carpeta.
@@ -23,6 +25,14 @@ def create_app(config_class=Config):
     login_manager.init_app(app)
     csrf.init_app(app)
     limiter.init_app(app)
+
+    # Conexión a Redis para RQ (Redis Queue) - para tareas en segundo plano como el pronóstico de ventas con Prophet.
+    # Por defecto, Redis corre en el puerto 6379 localmente, y usamos la base de datos 0 para esta aplicación. 
+    app.redis = Redis.from_url('redis://localhost:6379/0')
+    # Creamos una cola llamada 'forecast-tasks'
+    app.task_queue = rq.Queue('forecast-tasks', connection=app.redis)
+
+    
 
     # Configuracion de Flask-Login 
     login_manager.login_view = 'auth.login'  # Redirige a la página de login si el usuario no está autenticado

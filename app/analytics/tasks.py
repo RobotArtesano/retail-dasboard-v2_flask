@@ -2,6 +2,8 @@
 from prophet import Prophet
 import pandas as pd
 
+import time
+
 def generate_forecast(df_sales):
     """
     Docstring for generate_forecast
@@ -19,3 +21,18 @@ def generate_forecast(df_sales):
 
     # Retorna solo las columnas relevantes del forecast para  ahorrar memoria en la DB/Cache
     return forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].to_dict()
+
+
+
+
+# Tarea de prueba para simular un proceso pesado en segundo plano, como el entrenamiento de Prophet o Random Forest.
+
+def tarea_de_prueba(user_id):
+    """Una tarea simulada que tarda 10 segundos en terminar."""
+    print(f"[{user_id}] ⏳ Iniciando cálculo de pronóstico pesado...")
+    
+    # Simulamos que estamos entrenando Prophet y Random Forest
+    time.sleep(10) 
+    
+    print(f"[{user_id}] ✅ Pronóstico terminado y guardado en la Base de Datos.")
+    return True
