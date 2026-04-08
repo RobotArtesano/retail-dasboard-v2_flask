@@ -8,7 +8,7 @@ from flask_limiter.util import get_remote_address
 from redis import Redis
 import rq
 
-# Inicialización de la aplicación Flask, la base de datos SQLAlchemy y el LoginManager
+# Inicialización de la aplicación Flask, la base de datos SQLAlchemy, el LoginManager, conexion a Redis y el Limiter para limitar la cantidad de solicitudes a la aplicación.
 # Este archivo convierte la carpeta app en un paquete de Python, permitiendo la importación de módulos dentro de la carpeta.
 
 db = SQLAlchemy()

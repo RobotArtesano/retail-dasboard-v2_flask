@@ -9,7 +9,7 @@
 # El forecast tarda unos segundos en ejecutarse, por lo que lo hacemos en segundo plano para no bloquear la experiencia del usuario 
 # si se bloquea request, se bloquea toda la app, por eso es importante usar tareas en segundo plano para procesos pesados o que tarden mucho tiempo.
 
-# PARA EL PROYECTO RETAIL, USAMOS RQ POR SU SENCILLEZ Y FACIL INTEGRACION CON FLASK, PERO CELERY ES UNA ALTERNATIVA MAS COMPLEJA PERO MAS POTENTE.
+# PARA EL PROYECTO RETAIL, USAMOS RQ POR SU SENCILLEZ Y FACIL INTEGRACION CON FLASK, AUNQUE CELERY ES UNA ALTERNATIVA MAS COMPLEJA PERO MAS POTENTE.
 
 import os
 import redis
