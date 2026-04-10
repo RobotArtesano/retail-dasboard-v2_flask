@@ -43,8 +43,8 @@ def create_app(config_class=Config):
     from app.auth.routes import bp as auth_bp
     app.register_blueprint(auth_bp, url_prefix='/auth') # las rutas de auth estarán bajo el prefijo /auth (ej: /auth/login, /auth/register)
 
-    # from app.analytics.routes import bp as analytics_bp
-    # app.register_blueprint(analytics_bp, url_prefix='/analytics')
+    from app.analytics.routes import bp as analytics_bp
+    app.register_blueprint(analytics_bp, url_prefix='/')
 
     from app.dashboard.routes import bp as dashboard_bp
     # Al dashboard es la página principal, no le asignamos un prefijo de URL, para que esté disponible en la raíz del sitio.

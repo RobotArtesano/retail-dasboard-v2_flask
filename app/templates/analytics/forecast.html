@@ -1,15 +1,432 @@
 {% extends "layout.html" %}
-
-{% block title %}
-forecast
-{% endblock %}
+{% block title %}Forecast{% endblock %}
 
 {% block main %}
 
-<footer class="mb-5">
+<!-- Bootstrap Icons via CDN -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+<style>
+  :root {
+    --black-green:  #344239;
+    --retail-green: #23C467;
+    --retail-gold:  #D4AF37;
+    --alert-orange: #D35400;
+    --pure-white:   #FFFFFF;
+  }
+
+  /* ── Selector de granularidad ── */
+  .gran-card {
+    border: 1.5px solid #dee2e6;
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    cursor: pointer;
+    transition: border-color .2s, box-shadow .2s, background .2s;
+    background: var(--pure-white);
+    height: 100%;
+  }
+  .gran-card:hover {
+    border-color: var(--retail-green);
+    box-shadow: 0 0 0 3px rgba(35,196,103,.12);
+  }
+  .btn-check:checked + .gran-card {
+    border-color: var(--retail-green);
+    background: rgba(35,196,103,.06);
+    box-shadow: 0 0 0 3px rgba(35,196,103,.18);
+  }
+  .gran-icon {
+    font-size: 1.6rem;
+    margin-bottom: .5rem;
+    display: block;
+    color: var(--black-green);
+  }
+  .btn-check:checked + .gran-card .gran-icon {
+    color: var(--retail-green);
+  }
+  .gran-title {
+    font-weight: 600;
+    color: var(--black-green);
+    margin-bottom: .25rem;
+    font-size: .95rem;
+  }
+  .gran-desc {
+    font-size: .8rem;
+    color: #6c757d;
+    line-height: 1.45;
+    margin-bottom: .4rem;
+  }
+  .gran-badge {
+    font-size: .72rem;
+    background: rgba(35,196,103,.15);
+    color: var(--black-green);
+    border-radius: 20px;
+    padding: 2px 10px;
+    display: inline-block;
+    font-weight: 500;
+  }
+
+  /* ── Botón entrenar ── */
+  #btn-entrenar {
+    background-color: var(--black-green);
+    color: var(--pure-white);
+    border: none;
+    border-radius: 8px;
+    padding: .6rem 2rem;
+    font-size: .9rem;
+    font-weight: 500;
+    transition: background .2s, transform .1s;
+  }
+  #btn-entrenar:hover:not(:disabled) {
+    background-color: var(--retail-green);
+    transform: translateY(-1px);
+  }
+  #btn-entrenar:disabled {
+    background-color: #adb5bd;
+    cursor: not-allowed;
+  }
+
+  /* ── Barra de progreso ── */
+  .progress { border-radius: 20px; background: #e9ecef; }
+  .progress-bar {
+    background: linear-gradient(90deg, var(--retail-green), #1aa855);
+    border-radius: 20px;
+    transition: width .4s ease;
+  }
+
+  /* ── Cards de resumen post-entrenamiento ── */
+  .result-card {
+    border-radius: 12px;
+    border: 1.5px solid #dee2e6;
+    padding: 1.1rem 1.4rem;
+    text-align: left;
+  }
+  .result-card .rc-label {
+    font-size: .75rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-bottom: .2rem;
+  }
+  .result-card .rc-value {
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: var(--black-green);
+    line-height: 1;
+  }
+  .result-card.green  { border-color: var(--retail-green); background: rgba(35,196,103,.05); }
+  .result-card.gold   { border-color: var(--retail-gold);  background: rgba(212,175,55,.06); }
+  .result-card.orange { border-color: var(--alert-orange); background: rgba(211,84,0,.05); }
+
+  /* ── Estado de paso (timeline) ── */
+  .step-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: #dee2e6;
+    display: inline-block;
+    margin-right: 6px;
+    transition: background .3s;
+  }
+  .step-dot.active  { background: var(--retail-green); }
+  .step-dot.done    { background: var(--black-green); }
+
+  /* ── Info strip ── */
+  .info-strip {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: .6rem 1rem;
+    font-size: .8rem;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+</style>
+
+<div class="row justify-content-center">
+<div class="col-lg-7">
+
+  <!-- Header -->
+  <div class="text-start mb-4">
+    <h3 class="fw-bold mb-1" style="color:var(--black-green);">
+      Pronóstico de Demanda
+    </h3>
+    <p class="text-muted mb-0" style="font-size:.9rem;">
+      Entrena el modelo predictivo con tu historial de ventas.
+    </p>
+  </div>
+
+  {% if total_registros == 0 %}
+  <!-- ── Estado vacío ─────────────────────────────────────── -->
+  <div class="alert text-start d-flex align-items-start gap-3"
+       style="border-left:4px solid var(--alert-orange);
+              background:rgba(211,84,0,.05);border-radius:8px;border:none;">
+    <i class="bi bi-exclamation-triangle-fill fs-5 mt-1"
+       style="color:var(--alert-orange);"></i>
     <div>
-        SOON!
+      <strong>Sin datos de ventas.</strong><br>
+      <span class="text-muted" style="font-size:.875rem;">
+        Sube tu archivo de ventas en el
+        <a href="{{ url_for('dashboard.index') }}"
+           style="color:var(--retail-green);">Dashboard</a>
+        antes de entrenar el modelo.
+      </span>
     </div>
-</footer>
+  </div>
+
+  {% else %}
+  <!-- ── Card de configuración ────────────────────────────── -->
+  <div class="card border-0 shadow-sm mb-4" style="border-radius:14px;">
+    <div class="card-body p-4">
+
+      <p class="fw-semibold mb-3" style="font-size:.85rem;
+         text-transform:uppercase;letter-spacing:.05em;color:#6c757d;">
+        Granularidad del modelo
+      </p>
+
+      <div class="row g-3 mb-4">
+
+        <!-- Opción 1: Global -->
+        <div class="col-md-6 d-flex">
+          <input type="radio" class="btn-check" name="granularidad"
+                 id="opt-global" value="global" autocomplete="off" checked>
+          <label class="gran-card w-100" for="opt-global">
+            <i class="bi bi-globe2 gran-icon"></i>
+            <div class="gran-title">Global por SKU</div>
+            <p class="gran-desc">
+              Un modelo por producto sumando todas las tiendas.
+              El pronóstico se distribuye proporcionalmente según
+              el historial de cada sucursal.
+            </p>
+            <span class="gran-badge">
+              Recomendado · menos de 120 días por tienda
+            </span>
+          </label>
+        </div>
+
+        <!-- Opción 2: SKU × Tienda -->
+        <div class="col-md-6 d-flex">
+          <input type="radio" class="btn-check" name="granularidad"
+                 id="opt-sku-store" value="sku_store" autocomplete="off">
+          <label class="gran-card w-100" for="opt-sku-store">
+            <i class="bi bi-shop gran-icon"></i>
+            <div class="gran-title">Por SKU × Tienda</div>
+            <p class="gran-desc">
+              Un modelo por cada combinación producto-sucursal.
+              Captura patrones locales: festividades regionales,
+              promociones por tienda o variaciones de clima.
+            </p>
+            <span class="gran-badge">
+              Recomendado · más de 120 días por tienda
+            </span>
+          </label>
+        </div>
+
+      </div>
+
+      <!-- Info strip -->
+      <div class="info-strip mb-4">
+        <i class="bi bi-database" style="color:var(--retail-green);"></i>
+        Registros de ventas disponibles:
+        <strong style="color:var(--black-green);">{{ total_registros }}</strong>
+        {% if tiene_forecast %}
+        &nbsp;·&nbsp;
+        <i class="bi bi-check-circle" style="color:var(--retail-green);"></i>
+        Ya existe un pronóstico guardado — entrenar de nuevo lo reemplazará.
+        {% endif %}
+      </div>
+
+      <!-- Botón -->
+      <button id="btn-entrenar" onclick="iniciarEntrenamiento()">
+        <i class="bi bi-cpu me-2"></i>Entrenar modelo
+      </button>
+
+    </div>
+  </div>
+
+  <!-- ── Panel de progreso ─────────────────────────────────── -->
+  <div id="panel-progreso" class="card border-0 shadow-sm mb-4 d-none"
+       style="border-radius:14px;">
+    <div class="card-body p-4">
+
+      <!-- Timeline de pasos -->
+      <div class="d-flex align-items-center gap-2 mb-3" id="steps-timeline">
+        <span class="step-dot" id="dot-1"></span>
+        <span style="font-size:.75rem;color:#6c757d;">Extracción</span>
+        <span class="step-dot" id="dot-2"></span>
+        <span style="font-size:.75rem;color:#6c757d;">Modelado</span>
+        <span class="step-dot" id="dot-3"></span>
+        <span style="font-size:.75rem;color:#6c757d;">Guardado</span>
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="fw-semibold" id="progreso-titulo"
+              style="font-size:.9rem;color:var(--black-green);">
+          Preparando...
+        </span>
+        <span id="progreso-pct"
+              style="font-size:.8rem;color:var(--retail-green);font-weight:600;">
+          0%
+        </span>
+      </div>
+
+      <div class="progress mb-2" style="height:6px;">
+        <div id="progreso-barra" class="progress-bar"
+             role="progressbar" style="width:0%"></div>
+      </div>
+
+      <small class="text-muted" id="progreso-mensaje">Iniciando...</small>
+    </div>
+  </div>
+
+  <!-- ── Panel de resultado ────────────────────────────────── -->
+  <div id="panel-resultado" class="d-none">
+
+    <!-- Éxito -->
+    <div id="resultado-exito" class="d-none">
+      <p class="fw-semibold mb-3" style="font-size:.85rem;
+         text-transform:uppercase;letter-spacing:.05em;color:#6c757d;">
+        Resumen del entrenamiento
+      </p>
+      <div class="row g-3 mb-3">
+        <div class="col-4">
+          <div class="result-card green">
+            <div class="rc-label">Ensemble (Prophet+RF)</div>
+            <div class="rc-value" id="rc-ensemble">—</div>
+          </div>
+        </div>
+        <div class="col-4">
+          <div class="result-card gold">
+            <div class="rc-label">Fallback (media móvil)</div>
+            <div class="rc-value" id="rc-ma">—</div>
+          </div>
+        </div>
+        <div class="col-4">
+          <div class="result-card orange">
+            <div class="rc-label">SKUs con error</div>
+            <div class="rc-value" id="rc-err">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="info-strip">
+        <i class="bi bi-check-circle-fill" style="color:var(--retail-green);"></i>
+        Pronóstico guardado. Puedes consultarlo en la vista de resultados.
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div id="resultado-error" class="d-none">
+      <div class="d-flex align-items-start gap-3 p-3"
+           style="border-left:4px solid var(--alert-orange);
+                  background:rgba(211,84,0,.05);border-radius:8px;">
+        <i class="bi bi-x-circle-fill fs-5 mt-1"
+           style="color:var(--alert-orange);"></i>
+        <div>
+          <strong>Error en el entrenamiento</strong><br>
+          <span class="text-muted" id="error-msg" style="font-size:.875rem;"></span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  {% endif %}
+
+</div>
+</div>
+
+<script>
+let pollingInterval = null;
+
+function iniciarEntrenamiento() {
+  const granularidad = document.querySelector('input[name="granularidad"]:checked').value;
+  const btn          = document.getElementById('btn-entrenar');
+
+  btn.disabled      = true;
+  btn.innerHTML     = '<span class="spinner-border spinner-border-sm me-2"></span>Entrenando...';
+
+  document.getElementById('panel-progreso').classList.remove('d-none');
+  document.getElementById('panel-resultado').classList.add('d-none');
+  document.getElementById('resultado-exito').classList.add('d-none');
+  document.getElementById('resultado-error').classList.add('d-none');
+
+  actualizarProgreso(0, 'Enviando tarea al servidor...');
+  setDot(1);
+
+  fetch('/forecast/train', {
+    method : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify({ granularidad })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.error) { mostrarError(data.error); return; }
+    iniciarPolling(data.job_id);
+  })
+  .catch(() => mostrarError('Error de conexión con el servidor.'));
+}
+
+function iniciarPolling(jobId) {
+  pollingInterval = setInterval(() => {
+    fetch(`/forecast/status/${jobId}`)
+    .then(r => r.json())
+    .then(data => {
+      const pct = data.progress || 0;
+      actualizarProgreso(pct, data.message || '');
+
+      if      (pct <  20) setDot(1);
+      else if (pct <  90) setDot(2);
+      else                setDot(3);
+
+      if (data.status === 'finished') {
+        clearInterval(pollingInterval);
+        mostrarExito(data.result);
+      } else if (data.status === 'failed') {
+        clearInterval(pollingInterval);
+        mostrarError('El entrenamiento falló. Revisa los logs del Worker.');
+      }
+    })
+    .catch(() => clearInterval(pollingInterval));
+  }, 3000);
+}
+
+function actualizarProgreso(pct, mensaje) {
+  document.getElementById('progreso-barra').style.width   = pct + '%';
+  document.getElementById('progreso-pct').textContent     = pct + '%';
+  document.getElementById('progreso-mensaje').textContent = mensaje;
+  document.getElementById('progreso-titulo').textContent  =
+    pct < 100 ? `Entrenando... ${pct}%` : '¡Completado!';
+}
+
+function setDot(active) {
+  [1,2,3].forEach(n => {
+    const d = document.getElementById('dot-' + n);
+    d.className = 'step-dot' + (n < active ? ' done' : n === active ? ' active' : '');
+  });
+}
+
+function mostrarExito(result) {
+  const btn = document.getElementById('btn-entrenar');
+  btn.disabled  = false;
+  btn.innerHTML = '<i class="bi bi-arrow-repeat me-2"></i>Volver a entrenar';
+
+  document.getElementById('rc-ensemble').textContent = result?.resumen?.ensemble       ?? 0;
+  document.getElementById('rc-ma').textContent       = result?.resumen?.moving_average ?? 0;
+  document.getElementById('rc-err').textContent      = result?.errores?.length         ?? 0;
+
+  document.getElementById('panel-resultado').classList.remove('d-none');
+  document.getElementById('resultado-exito').classList.remove('d-none');
+}
+
+function mostrarError(msg) {
+  clearInterval(pollingInterval);
+  const btn     = document.getElementById('btn-entrenar');
+  btn.disabled  = false;
+  btn.innerHTML = '<i class="bi bi-cpu me-2"></i>Reintentar';
+
+  document.getElementById('panel-progreso').classList.add('d-none');
+  document.getElementById('error-msg').textContent = msg;
+  document.getElementById('panel-resultado').classList.remove('d-none');
+  document.getElementById('resultado-error').classList.remove('d-none');
+}
+</script>
 
 {% endblock %}
