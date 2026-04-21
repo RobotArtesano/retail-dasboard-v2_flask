@@ -129,6 +129,29 @@
   .step-dot.active  { background: var(--retail-green); }
   .step-dot.done    { background: var(--black-green); }
 
+  /* ── Selector de horizonte ── */
+  .horizonte-btn {
+    border: 1.5px solid #dee2e6;
+    border-radius: 8px;
+    padding: .4rem 1rem;
+    font-size: .82rem;
+    font-weight: 500;
+    color: #6c757d;
+    background: var(--pure-white);
+    cursor: pointer;
+    transition: border-color .2s, color .2s, background .2s;
+    white-space: nowrap;
+  }
+  .horizonte-btn:hover {
+    border-color: var(--retail-green);
+    color: var(--black-green);
+  }
+  .btn-check:checked + .horizonte-btn {
+    border-color: var(--black-green);
+    background: var(--black-green);
+    color: var(--pure-white);
+  }
+
   /* ── Info strip ── */
   .info-strip {
     background: #f8f9fa;
@@ -220,6 +243,51 @@
             </span>
           </label>
         </div>
+
+      </div>
+
+      <!-- Separador -->
+      <hr style="border-color:#f0f0f0;margin:1.5rem 0 1.25rem;">
+
+      <!-- Selector de horizonte -->
+      <p class="fw-semibold mb-3" style="font-size:.85rem;
+         text-transform:uppercase;letter-spacing:.05em;color:#6c757d;">
+        Horizonte de pronóstico
+      </p>
+
+      <div class="d-flex gap-2 flex-wrap mb-4">
+
+        <input type="radio" class="btn-check" name="horizonte"
+               id="h-30" value="30" autocomplete="off" checked>
+        <label for="h-30" class="horizonte-btn">
+          30 días
+          <span style="display:block;font-size:.7rem;font-weight:400;
+                       opacity:.75;margin-top:1px;">Reposición operativa</span>
+        </label>
+
+        <input type="radio" class="btn-check" name="horizonte"
+               id="h-60" value="60" autocomplete="off">
+        <label for="h-60" class="horizonte-btn">
+          60 días
+          <span style="display:block;font-size:.7rem;font-weight:400;
+                       opacity:.75;margin-top:1px;">Planificación táctica</span>
+        </label>
+
+        <input type="radio" class="btn-check" name="horizonte"
+               id="h-90" value="90" autocomplete="off">
+        <label for="h-90" class="horizonte-btn">
+          90 días
+          <span style="display:block;font-size:.7rem;font-weight:400;
+                       opacity:.75;margin-top:1px;">Planificación estacional</span>
+        </label>
+
+        <input type="radio" class="btn-check" name="horizonte"
+               id="h-120" value="120" autocomplete="off">
+        <label for="h-120" class="horizonte-btn">
+          120 días
+          <span style="display:block;font-size:.7rem;font-weight:400;
+                       opacity:.75;margin-top:1px;">Temporada completa</span>
+        </label>
 
       </div>
 
@@ -338,6 +406,7 @@ let pollingInterval = null;
 
 function iniciarEntrenamiento() {
   const granularidad = document.querySelector('input[name="granularidad"]:checked').value;
+  const horizonte    = parseInt(document.querySelector('input[name="horizonte"]:checked').value);
   const btn          = document.getElementById('btn-entrenar');
 
   btn.disabled      = true;
@@ -354,7 +423,7 @@ function iniciarEntrenamiento() {
   fetch('/forecast/train', {
     method : 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body   : JSON.stringify({ granularidad })
+    body   : JSON.stringify({ granularidad, horizonte })
   })
   .then(r => r.json())
   .then(data => {

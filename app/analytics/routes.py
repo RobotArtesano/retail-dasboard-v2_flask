@@ -37,10 +37,14 @@ def train():
     """
     data = request.get_json()
     granularidad = data.get('granularidad')
+    horizonte = data.get('horizonte', 30)  # Días a pronosticar, por defecto 30
 
     if granularidad not in ('global', 'sku_store'):
         return jsonify({'error': 'Granularidad inválida'}), 400
 
+    if horizonte not in (30, 60, 90, 120):
+        return jsonify({'error': 'Horizonte inválido'}), 400
+    
     # Verificamos que el usuario tiene datos antes de encolar la tarea
     tiene_datos = db.session.query(Sale.sale_id)\
         .filter(Sale.user_id == current_user.user_id)\
@@ -55,7 +59,7 @@ def train():
 
     job = current_app.task_queue.enqueue(
         tarea_entrenamiento,
-        args=(current_user.user_id, granularidad),
+        args=(current_user.user_id, granularidad, horizonte),
         job_timeout=3600   # 1 hora máximo (Prophet sobre muchos SKUs puede tardar)
     )
 
