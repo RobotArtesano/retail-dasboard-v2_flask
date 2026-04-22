@@ -8,10 +8,13 @@ from flask_limiter.util import get_remote_address
 from redis import Redis
 import rq
 
+from flask_migrate import Migrate
+
 # Inicialización de la aplicación Flask, la base de datos SQLAlchemy, el LoginManager, conexion a Redis y el Limiter para limitar la cantidad de solicitudes a la aplicación.
 # Este archivo convierte la carpeta app en un paquete de Python, permitiendo la importación de módulos dentro de la carpeta.
 
 db = SQLAlchemy()
+migrate = Migrate()
 login_manager = LoginManager()
 csrf = CSRFProtect()
 limiter = Limiter(key_func=get_remote_address, default_limits=["200 per day", "50 per hour"])
@@ -22,6 +25,7 @@ def create_app(config_class=Config):
 
     # Inicializar extensiones
     db.init_app(app)
+    migrate.init_app(app, db)
     login_manager.init_app(app)
     csrf.init_app(app)
     limiter.init_app(app)

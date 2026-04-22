@@ -65,7 +65,10 @@ def tarea_entrenamiento(user_id: int, granularidad: str, horizonte: int = 30) ->
 
     # Ciclo por cada serie extraída, clasificamos la estrategia, entrenamos el modelo correspondiente y persistimos resultados.
 
+    BATCH_SIZE = 20  # Commit cada 20 SKUs
+
     for i, (clave, serie) in enumerate(series.items(), start=1):
+        # i: contador de progreso, clave: SKU o SKU__Tienda, serie: DataFrame con ds, y para esa combinación.
         # Distribuimos el progeso: 5% extraccion + 5% -> 90% modelado -> 100% final y persistencia(gurdado en DB)
         pct = 5 + int((i / total) * 85)
         _progreso(pct, f'Modelando {i}/{total}: {clave}...')
@@ -87,6 +90,23 @@ def tarea_entrenamiento(user_id: int, granularidad: str, horizonte: int = 30) ->
 
         except Exception as e:
             errores.append(f'{clave}: {str(e)}')
+            db.session.rollback()  # En caso de error, revertimos cualquier cambio parcial en la DB del SKU fallido
+
+        # Commit por lotes para no perder todo si falla tarde
+        if i % BATCH_SIZE == 0:
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                errores.append(f'Error en commit lote {i}: {str(e)}')
+
+    # Commit final para los SKUs que sobran del último lote
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        errores.append(f'Error en commit final: {str(e)}')
+        
 
     _progreso(100, f'Listo. {resumen["ensemble"]} ensemble, {resumen["moving_average"]} moving average.')
     return {'ok': True, 'resumen': resumen, 'errores': errores}
@@ -761,8 +781,91 @@ def _metricas_moving_average(serie: pd.DataFrame) -> dict:
 
 
 def _persistir(forecast_df, clave, user_id, granularidad, proporciones):
-    """Guarda pronósticos en ForecastResult. Paso 4."""
-    raise NotImplementedError("Paso 4 pendiente")
+    """Guarda pronósticos en ForecastResult.
+    Modo global   → distribuye el pronóstico por tienda usando proporciones
+                    históricas. Genera un registro por tienda por fecha.
+    Modo sku_store → guarda directamente, la clave ya tiene SKU y tienda.
+
+    Las métricas se serializan en un campo JSON si el modelo las calculó.
+    """
+    # ── Decodificar la clave ──────────────────────────────────────────────────
+    if granularidad == 'global':
+        sku   = clave
+        store = None
+    else:
+        # clave = 'SKU001__TiendaA'
+        partes = clave.split('__', 1)
+        sku    = partes[0]
+        store  = partes[1] if len(partes) > 1 else 'Sin tienda'
+
+    # ── Buscar product_id interno ─────────────────────────────────────────────
+    producto = Product.query.filter_by(
+        sku_code = sku,
+        user_id  = user_id
+    ).first()
+
+    if not producto:
+        # No debería pasar, pero si el catálogo fue borrado entre extracción
+        # y persistencia lo saltamos silenciosamente
+        return
+
+    product_id = producto.id
+
+    # ── Construir registros ───────────────────────────────────────────────────
+    registros = []
+
+    if granularidad == 'sku_store':
+        # Modo directo: un registro por fecha
+        for _, row in forecast_df.iterrows():
+            registros.append(ForecastResult(
+                user_id    = user_id,
+                product_id = product_id,
+                store      = store,
+                date       = row['ds'].date(),
+                yhat       = round(float(row['yhat']),       2),
+                yhat_lower = round(float(row['yhat_lower']), 2),
+                yhat_upper = round(float(row['yhat_upper']), 2),
+            ))
+
+    else:
+        # Modo top-down: distribuimos el pronóstico global por tienda
+        tiendas_prop = proporciones.get(sku, {})
+
+        if not tiendas_prop:
+            # Si no hay historial por tienda, guardamos el total con store='global'
+            ## PENDIENTE GUARDAR PROPORCIONES GENERALES POR CATEGORIA O USUARIO PARA CASOS SIN HISTORIAL, EN LUGAR DE GUARDAR EN 'global'
+            for _, row in forecast_df.iterrows():
+                registros.append(ForecastResult(
+                    user_id    = user_id,
+                    product_id = product_id,
+                    store      = 'global',
+                    date       = row['ds'].date(),
+                    yhat       = round(float(row['yhat']),       2),
+                    yhat_lower = round(float(row['yhat_lower']), 2),
+                    yhat_upper = round(float(row['yhat_upper']), 2),
+                ))
+        else:
+            # Distribuimos proporcionalmente por cada tienda
+            for tienda, proporcion in tiendas_prop.items():
+                for _, row in forecast_df.iterrows():
+                    registros.append(ForecastResult(
+                        user_id    = user_id,
+                        product_id = product_id,
+                        store      = tienda,
+                        date       = row['ds'].date(),
+                        yhat       = round(float(row['yhat'])       * proporcion, 2),
+                        yhat_lower = round(float(row['yhat_lower']) * proporcion, 2),
+                        yhat_upper = round(float(row['yhat_upper']) * proporcion, 2),
+                    ))
+
+    # ── Inserción masiva ──────────────────────────────────────────────────────
+    if registros:
+        db.session.bulk_save_objects(registros)
+        # El flush escribe los cambios pendientes en la sesión a la base de datos sin hacer commit. 
+        #Esto es útil para liberar memoria y evitar que la sesión crezca demasiado, especialmente si estamos insertando muchos registros.
+        db.session.flush()   # flush sin commit — el commit lo hace tarea_entrenamiento
+
+    
 
 
 
