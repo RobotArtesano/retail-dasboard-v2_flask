@@ -14,6 +14,7 @@
         integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
         crossorigin="anonymous"></script>
 
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <link href="/static/css/styles.css" rel="stylesheet">
 
@@ -38,6 +39,7 @@
                 {% if current_user.is_authenticated %}
                 <ul class="navbar-nav me-auto mt-2">
                     <li class="nav-item"><a class="nav-link" href="/forecast">Forecast</a></li>
+                    <li class="nav-item"><a class="nav-link" href="{{ url_for('analytics.forecast_results') }}">Resultados FCST</a></li>
                     <li class="nav-item"><a class="nav-link" href="/finance">Finance</a></li>
                     <li class="nav-item"><a class="nav-link" href="/dashboard">Dashboard</a></li>
                 </ul>

@@ -49,6 +49,7 @@ def create_app(config_class=Config):
 
     from app.analytics.routes import bp as analytics_bp
     app.register_blueprint(analytics_bp, url_prefix='/')
+    #csrf.exempt(analytics_bp)  # Exentamos las rutas de analytics del CSRF porque reciben solicitudes AJAX desde el frontend, y manejar tokens CSRF en AJAX puede ser complicado. Asegúrate de tener otras medidas de seguridad en su lugar, como la verificación de que el usuario está autenticado.
 
     from app.dashboard.routes import bp as dashboard_bp
     # Al dashboard es la página principal, no le asignamos un prefijo de URL, para que esté disponible en la raíz del sitio.

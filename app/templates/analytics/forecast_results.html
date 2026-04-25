@@ -1,0 +1,647 @@
+{% extends "layout.html" %}
+{% block title %}Resultados del Forecast{% endblock %}
+
+{% block main %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+<style>
+  :root {
+    --black-green:  #344239;
+    --retail-green: #23C467;
+    --retail-gold:  #D4AF37;
+    --alert-orange: #D35400;
+    --pure-white:   #FFFFFF;
+    --bg-soft:      #f8f9fa;
+    --border:       #e9ecef;
+  }
+
+  /* ── Filtros ── */
+  .filtros-bar {
+    background: var(--pure-white);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    display: flex;
+    gap: .75rem;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-bottom: 1.5rem;
+  }
+  .filtro-group {
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+    min-width: 150px;
+    flex: 1;
+  }
+  .filtro-group label {
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: #6c757d;
+    font-weight: 600;
+  }
+  .filtro-group select {
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: .4rem .75rem;
+    font-size: .85rem;
+    color: var(--black-green);
+    background: var(--pure-white);
+    cursor: pointer;
+    transition: border-color .2s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16'%3E%3Cpath fill='%23344239' d='M7.247 11.14L2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right .6rem center;
+    padding-right: 2rem;
+  }
+  .filtro-group select:focus {
+    outline: none;
+    border-color: var(--retail-green);
+    box-shadow: 0 0 0 3px rgba(35,196,103,.12);
+  }
+  .btn-reset {
+    background: none;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: .4rem .9rem;
+    font-size: .82rem;
+    color: #6c757d;
+    cursor: pointer;
+    transition: border-color .2s, color .2s;
+    align-self: flex-end;
+    white-space: nowrap;
+  }
+  .btn-reset:hover {
+    border-color: var(--alert-orange);
+    color: var(--alert-orange);
+  }
+
+  /* ── Gráfica ── */
+  .chart-card {
+    background: var(--pure-white);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+    min-height: 380px;
+  }
+  .chart-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: .5rem;
+  }
+  .chart-title {
+    font-size: .95rem;
+    font-weight: 700;
+    color: var(--black-green);
+    margin: 0;
+  }
+  .chart-subtitle {
+    font-size: .78rem;
+    color: #6c757d;
+    margin: 0;
+  }
+  .chart-badges {
+    display: flex;
+    gap: .4rem;
+    flex-wrap: wrap;
+  }
+  .badge-metric {
+    font-size: .72rem;
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-weight: 500;
+  }
+  .badge-ensemble {
+    background: rgba(35,196,103,.12);
+    color: var(--black-green);
+  }
+  .badge-ma {
+    background: rgba(212,175,55,.15);
+    color: #7a6010;
+  }
+  .badge-mae {
+    background: rgba(52,66,57,.08);
+    color: var(--black-green);
+  }
+  #chart-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    color: #adb5bd;
+    gap: .5rem;
+  }
+
+  /* ── Tabla ── */
+  .tabla-card {
+    background: var(--pure-white);
+    border: 1.5px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+  .tabla-header {
+    padding: .9rem 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .tabla-header span {
+    font-size: .82rem;
+    color: #6c757d;
+  }
+  #forecast-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .82rem;
+  }
+  #forecast-table thead th {
+    background: var(--bg-soft);
+    padding: .65rem 1rem;
+    text-align: left;
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: #6c757d;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  #forecast-table tbody tr {
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background .15s;
+  }
+  #forecast-table tbody tr:hover {
+    background: rgba(35,196,103,.05);
+  }
+  #forecast-table tbody tr.selected {
+    background: rgba(35,196,103,.10);
+    border-left: 3px solid var(--retail-green);
+  }
+  #forecast-table tbody td {
+    padding: .6rem 1rem;
+    color: var(--black-green);
+    vertical-align: middle;
+  }
+  .badge-modelo {
+    font-size: .68rem;
+    border-radius: 20px;
+    padding: 2px 8px;
+    font-weight: 500;
+  }
+  .badge-ensemble-sm { background: rgba(35,196,103,.12); color: var(--black-green); }
+  .badge-ma-sm       { background: rgba(212,175,55,.15); color: #7a6010; }
+
+  /* ── Paginación ── */
+  .paginacion {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: .4rem;
+    padding: .75rem 1.25rem;
+    border-top: 1px solid var(--border);
+  }
+  .pag-btn {
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    padding: .3rem .7rem;
+    font-size: .78rem;
+    color: var(--black-green);
+    background: var(--pure-white);
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+  }
+  .pag-btn:hover:not(:disabled) {
+    border-color: var(--retail-green);
+    background: rgba(35,196,103,.06);
+  }
+  .pag-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .pag-btn.active {
+    background: var(--black-green);
+    color: var(--pure-white);
+    border-color: var(--black-green);
+  }
+  .pag-info {
+    font-size: .78rem;
+    color: #6c757d;
+    margin: 0 .5rem;
+  }
+
+  /* ── Loading ── */
+  .loading-row td {
+    text-align: center;
+    padding: 2rem;
+    color: #adb5bd;
+    font-size: .85rem;
+  }
+</style>
+
+<div class="text-start mb-4">
+  <h3 class="fw-bold mb-1" style="color:var(--black-green);">Resultados del Forecast</h3>
+  <p class="text-muted mb-0" style="font-size:.9rem;">
+    Selecciona un SKU en la tabla para ver su serie de tiempo.
+  </p>
+</div>
+
+{% if not tiene_forecast %}
+<div class="alert text-start d-flex align-items-start gap-3"
+     style="border-left:4px solid var(--alert-orange);
+            background:rgba(211,84,0,.05);border-radius:8px;border:none;">
+  <i class="bi bi-exclamation-triangle-fill fs-5 mt-1" style="color:var(--alert-orange);"></i>
+  <div>
+    <strong>Sin pronósticos generados.</strong><br>
+    <span class="text-muted" style="font-size:.875rem;">
+      Ve a <a href="{{ url_for('analytics.forecast') }}"
+              style="color:var(--retail-green);">Forecast</a>
+      y entrena el modelo primero.
+    </span>
+  </div>
+</div>
+
+{% else %}
+
+<!-- ── Filtros ───────────────────────────────────────────────────────────── -->
+<div class="filtros-bar">
+
+  <div class="filtro-group">
+    <label>Departamento</label>
+    <select id="f-departamento" onchange="onDepartamentoChange()">
+      <option value="">Todos</option>
+      {% for d in departamentos %}
+      <option value="{{ d }}">{{ d }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="filtro-group">
+    <label>Categoría</label>
+    <select id="f-categoria" onchange="cargarTabla(1)">
+      <option value="">Todas</option>
+    </select>
+  </div>
+
+  <div class="filtro-group">
+    <label>Tienda</label>
+    <select id="f-tienda" onchange="cargarTabla(1)">
+      <option value="">Todas</option>
+      {% for t in tiendas %}
+      <option value="{{ t }}">{{ t }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <button class="btn-reset" onclick="resetFiltros()">
+    <i class="bi bi-x-circle me-1"></i>Limpiar filtros
+  </button>
+
+</div>
+
+<!-- ── Gráfica ───────────────────────────────────────────────────────────── -->
+<div class="chart-card">
+  <div class="chart-header">
+    <div>
+      <p class="chart-title" id="chart-title">Selecciona un SKU</p>
+      <p class="chart-subtitle" id="chart-subtitle">Haz clic en una fila de la tabla para ver la serie de tiempo</p>
+    </div>
+    <div class="chart-badges" id="chart-badges"></div>
+  </div>
+
+  <div id="chart-placeholder">
+    <i class="bi bi-graph-up" style="font-size:2.5rem;opacity:.3;"></i>
+    <span style="font-size:.85rem;">Ningún SKU seleccionado</span>
+  </div>
+  <div id="plotly-chart" style="display:none;"></div>
+</div>
+
+<!-- ── Tabla ─────────────────────────────────────────────────────────────── -->
+<div class="tabla-card">
+  <div class="tabla-header">
+    <p class="fw-semibold mb-0" style="font-size:.85rem;color:var(--black-green);">
+      SKUs con pronóstico
+    </p>
+    <span id="tabla-info">Cargando...</span>
+  </div>
+
+  <div style="overflow-x:auto;">
+    <table id="forecast-table">
+      <thead>
+        <tr>
+          <th>SKU</th>
+          <th>Nombre</th>
+          <th>Departamento</th>
+          <th>Categoría</th>
+          <th>Tienda</th>
+          <th style="text-align:right;">Pronóstico total</th>
+          <th style="text-align:right;">Prom. diario</th>
+          <th style="text-align:right;">Rango</th>
+          <th>Modelo</th>
+          <th style="text-align:right;">MAE</th>
+          <th style="text-align:right;">sMAPE%</th>
+        </tr>
+      </thead>
+      <tbody id="tabla-body">
+        <tr class="loading-row">
+          <td colspan="11">
+            <span class="spinner-border spinner-border-sm me-2"></span>Cargando...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="paginacion" id="paginacion"></div>
+</div>
+
+{% endif %}
+
+<script>
+let paginaActual  = 1;
+let filaSeleccionada = null;
+
+// ── Carga inicial ──────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => cargarTabla(1));
+
+// ── Filtro en cascada: departamento → categoría ───────────────────────────
+function onDepartamentoChange() {
+  const dep = document.getElementById('f-departamento').value;
+  const sel = document.getElementById('f-categoria');
+
+  sel.innerHTML = '<option value="">Todas</option>';
+
+  if (!dep) { cargarTabla(1); return; }
+
+  fetch(`/forecast/results/categorias?departamento=${encodeURIComponent(dep)}`)
+    .then(r => r.json())
+    .then(data => {
+      data.categorias.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c; opt.textContent = c;
+        sel.appendChild(opt);
+      });
+      cargarTabla(1);
+    });
+}
+
+function resetFiltros() {
+  document.getElementById('f-departamento').value = '';
+  document.getElementById('f-categoria').innerHTML = '<option value="">Todas</option>';
+  document.getElementById('f-tienda').value = '';
+  cargarTabla(1);
+}
+
+// ── Carga la tabla con paginación ─────────────────────────────────────────
+function cargarTabla(page) {
+  paginaActual = page;
+  const dep    = document.getElementById('f-departamento').value;
+  const cat    = document.getElementById('f-categoria').value;
+  const tienda = document.getElementById('f-tienda').value;
+
+  const params = new URLSearchParams({ page, per_page: 50 });
+  if (dep)    params.append('departamento', dep);
+  if (cat)    params.append('categoria',    cat);
+  if (tienda) params.append('tienda',       tienda);
+
+  const tbody = document.getElementById('tabla-body');
+  tbody.innerHTML = `
+    <tr class="loading-row">
+      <td colspan="11">
+        <span class="spinner-border spinner-border-sm me-2"></span>Cargando...
+      </td>
+    </tr>`;
+
+  fetch(`/forecast/results/data?${params}`)
+    .then(r => r.json())
+    .then(resp => {
+      renderTabla(resp.data);
+      renderPaginacion(resp.page, resp.pages, resp.total);
+    })
+    .catch(() => {
+      tbody.innerHTML = `<tr class="loading-row"><td colspan="11">Error al cargar datos.</td></tr>`;
+    });
+}
+
+// ── Render de filas ───────────────────────────────────────────────────────
+function renderTabla(rows) {
+  const tbody = document.getElementById('tabla-body');
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr class="loading-row"><td colspan="11">Sin resultados para los filtros seleccionados.</td></tr>`;
+    document.getElementById('tabla-info').textContent = '0 resultados';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => `
+    <tr onclick="seleccionarFila(this, '${r.sku}', '${r.tienda}')"
+        data-sku="${r.sku}" data-tienda="${r.tienda}">
+      <td><code style="font-size:.78rem;color:var(--black-green);">${r.sku}</code></td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+          title="${r.nombre}">${r.nombre}</td>
+      <td>${r.departamento}</td>
+      <td>${r.categoria}</td>
+      <td>${r.tienda}</td>
+      <td style="text-align:right;font-weight:600;">${r.yhat_total.toLocaleString('es-MX', {maximumFractionDigits:0})}</td>
+      <td style="text-align:right;">${r.yhat_avg.toLocaleString('es-MX', {maximumFractionDigits:1})}</td>
+      <td style="text-align:right;font-size:.75rem;color:#6c757d;">
+        ${r.yhat_lower.toLocaleString('es-MX', {maximumFractionDigits:0})}–${r.yhat_upper.toLocaleString('es-MX', {maximumFractionDigits:0})}
+      </td>
+      <td>
+        <span class="badge-modelo ${r.modelo === 'ensemble' ? 'badge-ensemble-sm' : 'badge-ma-sm'}">
+          ${r.modelo === 'ensemble' ? 'Ensemble' : 'Mov. Avg.'}
+        </span>
+      </td>
+      <td style="text-align:right;">${r.mae !== null ? r.mae : '—'}</td>
+      <td style="text-align:right;">${r.smape !== null ? r.smape + '%' : '—'}</td>
+    </tr>
+  `).join('');
+}
+
+// ── Render de paginación ──────────────────────────────────────────────────
+function renderPaginacion(page, pages, total) {
+  document.getElementById('tabla-info').textContent =
+    `${total.toLocaleString('es-MX')} resultado${total !== 1 ? 's' : ''}`;
+
+  const div = document.getElementById('paginacion');
+  if (pages <= 1) { div.innerHTML = ''; return; }
+
+  let html = `<span class="pag-info">Página ${page} de ${pages}</span>`;
+  html += `<button class="pag-btn" onclick="cargarTabla(${page-1})"
+            ${page === 1 ? 'disabled' : ''}>
+            <i class="bi bi-chevron-left"></i></button>`;
+
+  const rango = Array.from({length: pages}, (_, i) => i + 1)
+    .filter(p => p === 1 || p === pages || Math.abs(p - page) <= 1);
+
+  let prev = null;
+  rango.forEach(p => {
+    if (prev && p - prev > 1) html += `<span class="pag-info">…</span>`;
+    html += `<button class="pag-btn ${p === page ? 'active' : ''}"
+              onclick="cargarTabla(${p})">${p}</button>`;
+    prev = p;
+  });
+
+  html += `<button class="pag-btn" onclick="cargarTabla(${page+1})"
+            ${page === pages ? 'disabled' : ''}>
+            <i class="bi bi-chevron-right"></i></button>`;
+  div.innerHTML = html;
+}
+
+// ── Selección de fila → gráfica ───────────────────────────────────────────
+function seleccionarFila(tr, sku, tienda) {
+  // Highlight
+  if (filaSeleccionada) filaSeleccionada.classList.remove('selected');
+  tr.classList.add('selected');
+  filaSeleccionada = tr;
+
+  // Cargar serie
+  cargarGrafica(sku, tienda);
+}
+
+function cargarGrafica(sku, tienda) {
+  document.getElementById('chart-placeholder').style.display = 'none';
+  document.getElementById('plotly-chart').style.display = 'block';
+  document.getElementById('plotly-chart').innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:center;height:300px;color:#adb5bd;">' +
+    '<span class="spinner-border spinner-border-sm me-2"></span>Cargando serie...</div>';
+
+  fetch(`/forecast/results/serie?sku=${encodeURIComponent(sku)}&tienda=${encodeURIComponent(tienda)}`)
+    .then(r => r.json())
+    .then(data => {
+      renderGrafica(data);
+    })
+    .catch(() => {
+      document.getElementById('plotly-chart').innerHTML =
+        '<p class="text-center text-muted py-5">Error al cargar la serie.</p>';
+    });
+}
+
+function renderGrafica(data) {
+  // Actualizar header
+  document.getElementById('chart-title').textContent =
+    `${data.sku} — ${data.nombre}`;
+  document.getElementById('chart-subtitle').textContent =
+    `Tienda: ${data.tienda}`;
+
+  // Badges de métricas
+  const badges = document.getElementById('chart-badges');
+  badges.innerHTML = `
+    <span class="badge-metric ${data.modelo === 'ensemble' ? 'badge-ensemble' : 'badge-ma'}">
+      ${data.modelo === 'ensemble' ? 'Prophet + RF' : 'Media Móvil'}
+    </span>
+    ${data.mae   !== null ? `<span class="badge-metric badge-mae">MAE: ${data.mae}</span>`     : ''}
+    ${data.smape !== null ? `<span class="badge-metric badge-mae">sMAPE: ${data.smape}%</span>` : ''}
+  `;
+
+  const hist = data.historial;
+  const fc   = data.forecast;
+
+  // ── Traza 1: Historial real ──────────────────────────────────────────────
+  const traza_hist = {
+    x    : hist.map(d => d.ds),
+    y    : hist.map(d => d.y),
+    type : 'scatter',
+    mode : 'lines',
+    name : 'Ventas reales',
+    line : { color: '#344239', width: 2 },
+  };
+
+  // ── Traza 2: Banda superior (invisible, para fill) ───────────────────────
+  const traza_upper = {
+    x      : fc.map(d => d.ds),
+    y      : fc.map(d => d.yhat_upper),
+    type   : 'scatter',
+    mode   : 'lines',
+    name   : 'Límite superior',
+    line   : { color: 'transparent' },
+    showlegend: false,
+  };
+
+  // ── Traza 3: Banda inferior (con fill hacia upper) ───────────────────────
+  const traza_lower = {
+    x         : fc.map(d => d.ds),
+    y         : fc.map(d => d.yhat_lower),
+    type      : 'scatter',
+    mode      : 'lines',
+    fill      : 'tonexty',
+    fillcolor : 'rgba(35,196,103,0.12)',
+    name      : 'Intervalo de confianza',
+    line      : { color: 'transparent' },
+  };
+
+  // ── Traza 4: Pronóstico central ──────────────────────────────────────────
+  const traza_fc = {
+    x   : fc.map(d => d.ds),
+    y   : fc.map(d => d.yhat),
+    type: 'scatter',
+    mode: 'lines',
+    name: 'Pronóstico',
+    line: { color: '#23C467', width: 2.5, dash: 'dot' },
+  };
+
+  // ── Línea divisoria historial/forecast ───────────────────────────────────
+  const fecha_division = hist.length ? hist[hist.length - 1].ds : null;
+
+  const layout = {
+    margin     : { t: 20, r: 20, b: 40, l: 50 },
+    paper_bgcolor: 'transparent',
+    plot_bgcolor : 'transparent',
+    font       : { family: 'system-ui', size: 11, color: '#6c757d' },
+    xaxis      : {
+      gridcolor : '#f0f0f0',
+      linecolor : '#dee2e6',
+      showgrid  : true,
+    },
+    yaxis      : {
+      gridcolor : '#f0f0f0',
+      linecolor : '#dee2e6',
+      showgrid  : true,
+      title     : { text: 'Unidades', font: { size: 10 } }
+    },
+    legend     : {
+      orientation: 'h',
+      y: -0.15,
+      font: { size: 10 }
+    },
+    shapes: fecha_division ? [{
+      type     : 'line',
+      x0: fecha_division, x1: fecha_division,
+      y0: 0, y1: 1,
+      yref     : 'paper',
+      line     : { color: '#dee2e6', width: 1.5, dash: 'dash' }
+    }] : [],
+    annotations: fecha_division ? [{
+      x        : fecha_division,
+      y        : 1,
+      yref     : 'paper',
+      text     : 'Hoy',
+      showarrow: false,
+      font     : { size: 10, color: '#adb5bd' },
+      xanchor  : 'left',
+      yanchor  : 'top',
+      xshift   : 6
+    }] : []
+  };
+
+  const config = {
+    responsive    : true,
+    displaylogo   : false,
+    modeBarButtonsToRemove: ['lasso2d', 'select2d', 'autoScale2d'],
+  };
+
+  Plotly.newPlot('plotly-chart',
+    [traza_hist, traza_upper, traza_lower, traza_fc],
+    layout, config
+  );
+}
+</script>
+
+{% endblock %}

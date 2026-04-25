@@ -21,8 +21,8 @@ PROPHET_PARAMS = {
 
 RF_PARAMS = {
     'n_estimators'    : 100,
-    'max_depth'       : 5,
-    'min_samples_leaf': 5,
+    'max_depth'       : 5, # ANTERIOR 3
+    'min_samples_leaf': 5, # ANTERIOR 10
     'random_state'    : 42,
     'n_jobs'          : -1,
 }
@@ -43,13 +43,25 @@ def tarea_entrenamiento(user_id: int, granularidad: str, horizonte: int = 30) ->
 
     def _progreso(pct: int, msg:str):
         """"Escribe progreso en el meta del job para polling."""
+        print(f"[WORKER] {pct}% - {msg}")  # Loguea en consola del worker para debugging
         if job:
             job.meta['progress'] = pct
             job.meta['message'] = msg
             job.save_meta()
 
+    print("[WORKER] Tarea de entrenamiento iniciada") # Loguea en consola del worker para confirmar que la tarea se inició correctamente.
+    
     _progreso(5, 'Extrayendo series de tiempo...')
-    series = extraer_series(user_id, granularidad)
+    # series = extraer_series(user_id, granularidad)
+    
+    try:
+        series = extraer_series(user_id, granularidad)
+        print(f"[WORKER] Series extraídas: {len(series)}")   # ← y esto
+    except Exception as e:
+        print(f"[WORKER] ERROR en extraer_series: {e}")
+        return {'ok': False, 'error': str(e)}
+
+
     proporciones = calcular_proporciones_tienda(user_id) if granularidad == 'global' else {}
 
     if not series:
@@ -86,9 +98,14 @@ def tarea_entrenamiento(user_id: int, granularidad: str, horizonte: int = 30) ->
                 forecast_df = _modelo_moving_average(serie, horizonte)
                 metricas = _metricas_moving_average(serie)
 
+            print(f"[WORKER] forecast_df shape: {forecast_df.shape}")  # ← agrega
             _persistir(forecast_df, clave, user_id, granularidad, proporciones, metricas)
 
         except Exception as e:
+            import traceback
+            print(f"[WORKER] ERROR en {clave}: {e}")
+            print(traceback.format_exc())   # ← esto muestra el error completo con línea exacta
+
             errores.append(f'{clave}: {str(e)}')
             db.session.rollback()  # En caso de error, revertimos cualquier cambio parcial en la DB del SKU fallido
 
@@ -96,17 +113,21 @@ def tarea_entrenamiento(user_id: int, granularidad: str, horizonte: int = 30) ->
         if i % BATCH_SIZE == 0:
             try:
                 db.session.commit()
+                print(f"[WORKER] Commit lote {i} OK")  # ← agrega
             except Exception as e:
                 db.session.rollback()
                 errores.append(f'Error en commit lote {i}: {str(e)}')
+                print(f"[WORKER] ERROR commit lote {i}: {e}")  # ← agrega
 
     # Commit final para los SKUs que sobran del último lote
     try:
         db.session.commit()
+        print("[WORKER] Commit final OK")  # ← agrega
     except Exception as e:
         db.session.rollback()
         errores.append(f'Error en commit final: {str(e)}')
-        
+        print(f"[WORKER] ERROR commit final: {e}")  # ← agrega
+
 
     _progreso(100, f'Listo. {resumen["ensemble"]} ensemble, {resumen["moving_average"]} moving average.')
     return {'ok': True, 'resumen': resumen, 'errores': errores}
@@ -153,8 +174,8 @@ def extraer_series(user_id: int, granularidad: str) -> dict[str, pd.DataFrame]:
             Sale.store.label('store'),
             func.sum(Sale.qty_sold).label('y'),   # por si quedaron dupes(duplicados) post-ETL: sumamos ventas del mismo SKU-tienda-fecha (aunque idealmente no debería haber)
             # Agregamos precio de venta y precio lista para calcular descuento
-            func.avg(Sale.price).label('price_sale'),
-            func.avg(Product.list_price).label('price_list'),
+            func.avg(Sale.price_sale).label('price_sale'),
+            func.avg(Product.price).label('price_list'),
         )
         .join(Product, Sale.product_id == Product.id)
         .filter(Sale.user_id == user_id)
@@ -162,7 +183,8 @@ def extraer_series(user_id: int, granularidad: str) -> dict[str, pd.DataFrame]:
         .order_by(Sale.date)
     )
 
-    df_raw = pd.read_sql(query.statement, db.session.bind)
+    result = db.session.execute(query)
+    df_raw = pd.DataFrame(result.fetchall(), columns=result.keys())
 
     if df_raw.empty:
         return {}
@@ -205,8 +227,9 @@ def _rellenar_calendario(df: pd.DataFrame) -> pd.DataFrame:
         if col in df.columns:
             df[col] = df[col].ffill().bfill()
     
+    # Resetear indice y nombrar la columna de fecha correctamente para Prophet
     df = df.reset_index()
-    df.columns.name = None
+    df = df.rename(columns={'index': 'ds'})
     return df
 
 
@@ -223,8 +246,8 @@ def clasificar_serie(serie: pd.DataFrame) -> str:
     dias_con_venta = int((serie['y'] > 0).sum())
     pct_ceros = 1 - (dias_con_venta / total_dias) if total_dias > 0 else 1
 
-    if total_dias >= UMBRAL_DIAS_ENSEMBLE 
-                    and dias_con_venta >= UMBRAL_DIAS_VENTA
+    if total_dias >= UMBRAL_DIAS_ENSEMBLE \
+                    and dias_con_venta >= UMBRAL_DIAS_VENTA \
                     and pct_ceros < UMBRAL_CEROS:
         return 'ensemble'
     else:
@@ -254,7 +277,8 @@ def calcular_proporciones_tienda(user_id: int) -> dict[str, dict[str, float]]:
         .group_by(Product.sku_code, Sale.store)
     )
 
-    df = pd.read_sql(query.statement, db.session.bind)
+    result = db.session.execute(query)
+    df = pd.DataFrame(result.fetchall(), columns=result.keys())
 
     if df.empty:
         return {}
@@ -282,11 +306,17 @@ def _modelo_ensemble(serie: pd.DataFrame, horizonte: int = 30) -> pd.DataFrame:
     
      Retorna DataFrame con columnas [ds, yhat, yhat_lower, yhat_upper] con el pronóstico para los próximos 'horizonte' días."""
 
+    # print(f"[ENSEMBLE] serie y: min={serie['y'].min():.2f} max={serie['y'].max():.2f} mean={serie['y'].mean():.2f}")
+
      # 3A — Entrenamos Prophet
-     _, df_hist, df_fut = _entrenar_prophet(serie, horizonte)
+    _, df_hist, df_fut = _entrenar_prophet(serie, horizonte)
+
+    # print(f"[ENSEMBLE] prophet yhat: min={df_hist['yhat'].min():.2f} max={df_hist['yhat'].max():.2f}")
+    # print(f"[ENSEMBLE] df_fut yhat: min={df_fut['yhat'].min():.2f} max={df_fut['yhat'].max():.2f}")
 
      # 3B — Construimos features y entrenamos RF sobre residuales de Prophet
     df_train = _construir_features_historicos(serie, df_hist)
+    # print(f"[ENSEMBLE] residual: min={df_train['residual'].min():.2f} max={df_train['residual'].max():.2f} mean={df_train['residual'].mean():.2f}")
     rf, features_usados = _entrenar_rf(df_train)
 
     # 3B: Features del futuro (horizonte) — usamos historial real para lags y rolling, no predicciones
@@ -294,12 +324,15 @@ def _modelo_ensemble(serie: pd.DataFrame, horizonte: int = 30) -> pd.DataFrame:
     # Prediccion de RF sobre el horizonte futuro
     X_fut = df_fut_features[features_usados].fillna(0)
     rf_correccion = rf.predict(X_fut)
+
+    # print(f"[ENSEMBLE] rf_correccion: min={rf_correccion.min():.2f} max={rf_correccion.max():.2f} mean={rf_correccion.mean():.2f}")
+    # print(f"[ENSEMBLE] yhat_final: min={(df_fut['yhat'].values + rf_correccion).min():.2f} max={(df_fut['yhat'].values + rf_correccion).max():.2f}")
     
     # Ensemble final = Prophet + corrección RF
     df_fut = df_fut.copy()
-    df_fut['yhat']       = (df_fut['yhat']       + correccion_rf).clip(lower=0)
-    df_fut['yhat_lower'] = (df_fut['yhat_lower'] + correccion_rf).clip(lower=0)
-    df_fut['yhat_upper'] = (df_fut['yhat_upper'] + correccion_rf).clip(lower=0)
+    df_fut['yhat']       = (df_fut['yhat']       + rf_correccion).clip(lower=0)
+    df_fut['yhat_lower'] = (df_fut['yhat_lower'] + rf_correccion).clip(lower=0)
+    df_fut['yhat_upper'] = (df_fut['yhat_upper'] + rf_correccion).clip(lower=0)
 
     return df_fut[['ds', 'yhat', 'yhat_lower', 'yhat_upper']]
 
@@ -404,6 +437,15 @@ def _entrenar_prophet(serie: pd.DataFrame, horizonte: int) -> tuple:
     logging.getLogger('prophet').setLevel(logging.WARNING)
     logging.getLogger('cmdstanpy').setLevel(logging.WARNING)
 
+# ================================ DEBUGGING ================================
+    # debugging: imprimimos estadísticas básicas de la serie para entender su escala y comportamiento antes de entrenar el modelo. 
+    #Esto ayuda a detectar problemas como series vacías, con solo ceros, o con valores extremadamente altos que podrían afectar el entrenamiento.
+    # print(f"[PROPHET] Serie shape: {serie.shape}")
+    # print(f"[PROPHET] y stats: min={serie['y'].min():.1f} max={serie['y'].max():.1f} mean={serie['y'].mean():.1f} sum={serie['y'].sum():.1f}")
+    # print(f"[PROPHET] Fechas: {serie['ds'].min()} → {serie['ds'].max()}")
+    # print(f"[PROPHET] Días con venta > 0: {(serie['y'] > 0).sum()}")
+# ===========================================================================
+
     # ── Construir DataFrame de holidays de México ─────────────────────────────
     # Tomamos el rango de años que cubre la serie + el horizonte futuro
     anio_inicio = serie['ds'].dt.year.min()
@@ -467,15 +509,37 @@ def _entrenar_prophet(serie: pd.DataFrame, horizonte: int) -> tuple:
     # Usamos las mismas fechas del historial, no fechas nuevas
     df_hist = modelo.predict(serie[['ds']])
 
-    # ── Predicción futura ─────────────────────────────────────────────────────
-    futuro  = modelo.make_future_dataframe(periods=horizonte, freq='D')
-    df_fut  = modelo.predict(futuro)
+    # ── Predicción futura CODIGO ORIGINAL ───────────────────────────────
+    # Construccion automatica de futuro con make_future_dataframe de Prophet, pero a veces genera fechas extrañas o no respeta el calendario. 
+    # O ignora freq cuando la serie ya tiene frecuencia inferida(daily).
+    # Por eso lo hacemos manualmente.
+
+    # futuro  = modelo.make_future_dataframe(periods=horizonte, freq='D')
+    # df_fut  = modelo.predict(futuro)
+
+    # print(f"[PROPHET] futuro shape: {futuro.shape}")
+    # print(f"[PROPHET] futuro fechas: {futuro['ds'].tail(5)}")
 
     # Solo nos quedamos con las fechas futuras (posteriores al historial)
     # filtrado booleano: df_fut['ds'] > ultima_fecha y seleccionamos solo columnas relevantes para el pronóstico: ds, yhat, yhat_lower, yhat_upper.
     # .copy() para evitar SettingWithCopyWarning de pandas al modificar df_fut después.
-    ultima_fecha = serie['ds'].max()
-    df_fut = df_fut[df_fut['ds'] > ultima_fecha][['ds', 'yhat', 'yhat_lower', 'yhat_upper']].copy()
+
+    # ultima_fecha = serie['ds'].max()
+    # df_fut = df_fut[df_fut['ds'] > ultima_fecha][['ds', 'yhat', 'yhat_lower', 'yhat_upper']].copy()
+
+    # +=============================MODIFICADO===============================
+    # Construccion manual del DataFrame futuro:
+    ultima_fecha   = serie['ds'].max()
+    fechas_futuras = pd.date_range(
+        start   = ultima_fecha + pd.Timedelta(days=1),
+        periods = horizonte,
+        freq    = 'D'
+        )
+    futuro_df = pd.DataFrame({'ds': fechas_futuras})
+    df_fut    = modelo.predict(futuro_df)
+
+    # print(f"[PROPHET] futuro generado: {futuro_df['ds'].min()} → {futuro_df['ds'].max()} ({len(futuro_df)} días)")
+    # ======================================================================
 
     # Clip: nunca negativo
     # todo valor < 0 -> 0
@@ -545,6 +609,11 @@ def _construir_features_historicos(serie: pd.DataFrame, df_hist: pd.DataFrame) -
     # Las primeras 28 filas siempre tendrán NaN en lag_28
     df = df.dropna(subset=['lag_28', 'rolling_mean_14', 'rolling_mean_28'])
 
+    # ===================== MODIFICADO (agregado) =====================
+    # df[['rolling_std_7', 'discount_pct']] = df[['rolling_std_7', 'discount_pct']].fillna(0)
+    # df = df[df['residual'].notna()]
+    # =====================================================
+
     return df
 
 
@@ -572,6 +641,8 @@ def _construir_features_futuro(df_fut: pd.DataFrame,
     no sobre predicciones — así evitamos el problema de lags futuros.
     """
     df = df_fut.copy()
+    # Prophet devuelve 'yhat', lo renombramos para consistencia con el entrenamiento de RF
+    df = df.rename(columns={'yhat': 'yhat_prophet'})
 
     # ── Features de calendario (siempre disponibles) ──────────────────────────
     df['day_of_week'] = df['ds'].dt.dayofweek
@@ -610,7 +681,9 @@ def _construir_features_futuro(df_fut: pd.DataFrame,
         df['discount_pct'] = 0.0
         df['is_discount']  = 0
 
-    # IMPORTANTE FEATURE: pendiente modelo probabilistico para determiar nivel de inventario necesario para cubrir demanda con cierto nivel de servicio. Mientras tanto, usamos un proxy simple: días desde última venta.
+    # IMPORTANTE FEATURE: 
+    # pendiente modelo probabilistico para determiar nivel de inventario necesario para cubrir demanda con cierto nivel de servicio. 
+    # Mientras tanto, usamos un proxy simple: días desde última venta.
     # ── days_since_last_sale: al inicio del horizonte = días desde última venta
     ultima_venta = serie[serie['y'] > 0]['ds'].max()
     if pd.isna(ultima_venta):
@@ -618,12 +691,21 @@ def _construir_features_futuro(df_fut: pd.DataFrame,
     else:
         base_dias = (serie['ds'].max() - ultima_venta).days
 
-    df['days_since_last_sale'] = [base_dias + i for i in range(len(df))]
 
+    # ===================== MODIFICADO =====================
+    # Crea overfitting: En el historial este Feature vale 0 o numeros muy bajos (cuando hay ventas recientes).
+    # En el futuro vale base_dias + i, donde base_dias es la distancia desde la ultimaventa al final del historial 
+    # - que en los datos del pasado puede ser 0, pero en la fecha de prediccion a futuro RF lo interpreta como una serie muerta y 
+    # predice residuales muy negativos.
+
+     # df['days_since_last_sale'] = [base_dias + i for i in range(len(df))]
+
+    df['days_since_last_sale'] = 0
+    # ==============================
     return df
 
 
-def _entrenar_rf(df_train: pd.DataFrame) -> object:
+def _entrenar_rf(df_train: pd.DataFrame) -> tuple:
     """
     Entrena Random Forest sobre los residuales de Prophet.
 
@@ -646,6 +728,21 @@ def _entrenar_rf(df_train: pd.DataFrame) -> object:
 
     X = df_train[features_disponibles].fillna(0)
     y = df_train['residual'].fillna(0)
+
+    
+
+    # ==================================DEBUG: Estadísticas de entrenamiento RF ==============================
+    print(f"[RF] X shape: {X.shape}, y stats: min={y.min():.2f} max={y.max():.2f} mean={y.mean():.2f}")
+    print(f"[RF] Features usados: {features_disponibles}")
+
+    # Verificar que el target tiene varianza suficiente para aprender
+    if y.std() < 0.01:
+        print("[RF] Target sin varianza — RF no puede aprender, corrección = 0")
+        # Devolvemos un modelo dummy que siempre predice 0
+        rf = RandomForestRegressor(n_estimators=10, max_depth=1, random_state=42)
+        rf.fit(X, np.zeros(len(y)))
+        return rf, features_disponibles
+    # ================================== debug ============================================
 
     rf = RandomForestRegressor(
         n_estimators    = RF_PARAMS['n_estimators'],
@@ -780,7 +877,7 @@ def _metricas_moving_average(serie: pd.DataFrame) -> dict:
     }
 
 
-def _persistir(forecast_df, clave, user_id, granularidad, proporciones):
+def _persistir(forecast_df: pd.DataFrame, clave: str, user_id: int, granularidad: str, proporciones: dict, metricas: dict) -> None:
     """Guarda pronósticos en ForecastResult.
     Modo global   → distribuye el pronóstico por tienda usando proporciones
                     históricas. Genera un registro por tienda por fecha.
@@ -788,6 +885,7 @@ def _persistir(forecast_df, clave, user_id, granularidad, proporciones):
 
     Las métricas se serializan en un campo JSON si el modelo las calculó.
     """
+    print(f"[PERSISTIR] clave={clave} granularidad={granularidad} filas={len(forecast_df)}")
     # ── Decodificar la clave ──────────────────────────────────────────────────
     if granularidad == 'global':
         sku   = clave
@@ -804,10 +902,15 @@ def _persistir(forecast_df, clave, user_id, granularidad, proporciones):
         user_id  = user_id
     ).first()
 
+    print(f"[PERSISTIR] producto encontrado: {producto}")  # ← agrega
+
     if not producto:
+        print(f"[PERSISTIR] SKIP — producto {sku} no encontrado para user_id={user_id}")
         # No debería pasar, pero si el catálogo fue borrado entre extracción
         # y persistencia lo saltamos silenciosamente
         return
+
+    print(f"[PERSISTIR] product_id={producto.id} tiendas_prop={proporciones.get(sku, {})}")
 
     product_id = producto.id
 
@@ -825,6 +928,12 @@ def _persistir(forecast_df, clave, user_id, granularidad, proporciones):
                 yhat       = round(float(row['yhat']),       2),
                 yhat_lower = round(float(row['yhat_lower']), 2),
                 yhat_upper = round(float(row['yhat_upper']), 2),
+
+                modelo     = metricas['modelo'] if metricas else None,
+                mae        = metricas['mae']    if metricas else None,
+                rmse       = metricas['rmse']   if metricas else None,
+                mape       = metricas['mape']   if metricas else None,
+                smape      = metricas['smape']  if metricas else None,
             ))
 
     else:
@@ -843,6 +952,12 @@ def _persistir(forecast_df, clave, user_id, granularidad, proporciones):
                     yhat       = round(float(row['yhat']),       2),
                     yhat_lower = round(float(row['yhat_lower']), 2),
                     yhat_upper = round(float(row['yhat_upper']), 2),
+
+                    modelo     = metricas['modelo'] if metricas else None,
+                    mae        = metricas['mae']    if metricas else None,
+                    rmse       = metricas['rmse']   if metricas else None,
+                    mape       = metricas['mape']   if metricas else None,
+                    smape      = metricas['smape']  if metricas else None,
                 ))
         else:
             # Distribuimos proporcionalmente por cada tienda
@@ -856,6 +971,12 @@ def _persistir(forecast_df, clave, user_id, granularidad, proporciones):
                         yhat       = round(float(row['yhat'])       * proporcion, 2),
                         yhat_lower = round(float(row['yhat_lower']) * proporcion, 2),
                         yhat_upper = round(float(row['yhat_upper']) * proporcion, 2),
+
+                        modelo     = metricas['modelo'] if metricas else None,
+                        mae        = metricas['mae']    if metricas else None,
+                        rmse       = metricas['rmse']   if metricas else None,
+                        mape       = metricas['mape']   if metricas else None,
+                        smape      = metricas['smape']  if metricas else None,
                     ))
 
     # ── Inserción masiva ──────────────────────────────────────────────────────

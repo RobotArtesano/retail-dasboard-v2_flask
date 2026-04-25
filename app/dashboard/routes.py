@@ -289,3 +289,24 @@ def disparar_trabajador():
 # Nota: Para probar esta ruta, asegúrate de tener el worker corriendo en otra terminal. 
 #Luego, accede a http://localhost:5000/disparar-trabajador para enviar una tarea de prueba al worker.
 # Deberías ver la salida en la terminal del worker indicando que ha recibido y procesado la tarea.
+
+
+
+
+
+
+
+
+# PARA BORRAR INFO DE DB
+@bp.route('/dev/reset-data', methods=['POST'])
+@login_required
+def reset_data():
+    """Solo para desarrollo — borra todos los datos del usuario actual."""
+    from app.models import Sale, Inventory, Product, ForecastResult
+    ForecastResult.query.filter_by(user_id=current_user.user_id).delete()
+    Sale.query.filter_by(user_id=current_user.user_id).delete()
+    Inventory.query.filter_by(user_id=current_user.user_id).delete()
+    Product.query.filter_by(user_id=current_user.user_id).delete()
+    db.session.commit()
+    flash("Datos borrados correctamente.", "success")
+    return redirect(url_for('dashboard.index'))

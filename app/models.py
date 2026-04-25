@@ -174,6 +174,12 @@ class ForecastResult(db.Model):
     yhat_lower = db.Column(db.Float)  # Límite inferior del pronóstico
     yhat_upper = db.Column(db.Float)  # Límite superior del pronóstico
 
+    modelo = db.Column(db.String(30), nullable=False)
+    mae = db.Column(db.Float, nullable=False)  # Error absoluto medio del pronóstico
+    rmse = db.Column(db.Float, nullable=False)  # Raíz del error cuadrático medio del pronóstico
+    mape = db.Column(db.Float, nullable=False)  # Error porcentual absoluto medio del pronóstico
+    smape = db.Column(db.Float, nullable=False)  # Error porcentual absoluto medio simétrico del pronóstico
+
     # Unique constraint para evitar tener dos pronósticos para el mismo producto el mismo día-tienda para el mismo usuario.
     __table_args__ = (
         db.UniqueConstraint('product_id', 'store', 'date', 'user_id', name='uq_forecast_store_date'),

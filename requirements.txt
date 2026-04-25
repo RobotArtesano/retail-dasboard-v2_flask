@@ -56,3 +56,4 @@ wrapt==2.1.1
 WTForms==3.2.1
 holidays
 Flask-Migrate
+scikit-learn

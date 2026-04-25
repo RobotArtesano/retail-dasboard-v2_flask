@@ -422,8 +422,11 @@ function iniciarEntrenamiento() {
 
   fetch('/forecast/train', {
     method : 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body   : JSON.stringify({ granularidad, horizonte })
+    headers: { 'Content-Type': 'application/json', 
+              // 'X-CSRFToken': document.querySelector('meta[name="csrf-token"]').content 
+              'X-CSRFToken'  : document.querySelector('meta[name="csrf-token"]')?.content || ''
+    },
+    body: JSON.stringify({ granularidad, horizonte })
   })
   .then(r => r.json())
   .then(data => {

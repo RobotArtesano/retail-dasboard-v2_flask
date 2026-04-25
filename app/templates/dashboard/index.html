@@ -73,6 +73,8 @@
                                 Procesar y Guardar
                             </button>
                         </div>
+
+
                         <div class="mt-4 text-start text-muted small">
                             <p><i class="bi bi-info-circle"></i> <strong>Nota de integridad:</strong> Si sube un
                                 histórico de ventas
@@ -87,5 +89,15 @@
 
         </div>
     </div>
+    <!-- ##########J#####################Boton para borrar datos. ########################-->
+                         <form action="{{ url_for('dashboard.reset_data') }}" method="POST" enctype="multipart/form-data">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <div class="d-grid mt-5">
+                            <button type="submit" class="btn btn-retail btn-lg fw-bold shadow-sm">
+                                Borrar Todos los Datos
+                            </button>
+                        </div>
+                         </form>
+    <!-- ##########J#####################Boton para borrar datos. ########################-->
 </div>
 {% endblock %}

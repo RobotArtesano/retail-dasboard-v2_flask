@@ -234,10 +234,10 @@ def _validate_inventory(df: pd.DataFrame) -> Tuple[Optional[pd.DataFrame], List[
             # Si la columna es 'on_order', tiene sentido promediarla si hay duplicados, porque podría representar una cantidad en tránsito que se reparte entre varias filas.
             # Y para no sobreetimar cantidades que no sabemos si se van a recibir, es mejor promediarla. En cambio, para 'safety_stock' o 'lead_time_days',
             # tiene más sentido tomar el máximo, porque queremos asegurarnos de tener suficiente stock de seguridad o el tiempo de entrega más largo en caso de discrepancias.
-            if col in df.columns == 'on_order':  
+            if col == 'on_order':  
                 agg_dict[col] = 'mean'
-
-            agg_dict[col] = 'max'  
+            else:   
+                agg_dict[col] = 'max'  
 
     # Agrupamos aplicando nuestro diccionario dinamico.
     try:
